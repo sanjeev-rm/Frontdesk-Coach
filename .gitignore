@@ -1,0 +1,82 @@
+# Environment variables (NEVER commit API keys or secrets)
+.env
+.env.local
+.env.*.local
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Streamlit
+.streamlit/
+*.streamlit
+
+# Logs
+logs/
+*.log
+hotel_training_*.log
+hotel_training_errors_*.log
+
+# Data and cache
+data/vectorstore/
+data/sessions/
+*.db
+*.sqlite
+*.sqlite3
+.cache/
+*.pkl
+*.pickle
+
+# OS
+.DS_Store
+Thumbs.db
+.env.swp
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Miscellaneous
+*.tmp
+.env.bak
+config.bak

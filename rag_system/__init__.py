@@ -1,12 +1,11 @@
 """
-RAG System Module
+RAG System Module (YAML-backed)
 
-Handles document retrieval, vectorization, and similarity search
-for training document integration.
+Provides the retriever implementation used by coaching and reporting agents.
+The project uses a YAML-backed retriever by default when a single knowledge
+file (`hotel_training_reference.yaml`) is the canonical source.
 """
 
 from .retriever import RAGRetriever
-from .embeddings import EmbeddingGenerator
-from .vector_store import VectorStore
 
-__all__ = ['RAGRetriever', 'EmbeddingGenerator', 'VectorStore']
+__all__ = ['RAGRetriever']

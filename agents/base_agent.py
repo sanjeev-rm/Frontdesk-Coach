@@ -4,11 +4,11 @@ Base Agent Class
 Provides common functionality for all AI agents in the hotel training system.
 """
 
-import requests
 import json
 import logging
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
+from openai import OpenAI
 from config.settings import AppConfig
 
 class BaseAgent(ABC):
@@ -59,7 +59,7 @@ class BaseAgent(ABC):
     def _make_llm_request(self, messages: List[Dict[str, str]],
                          system_prompt: Optional[str] = None) -> str:
         """
-        Make request to LLM API
+        Make request to LLM API using OpenAI client
 
         Args:
             messages: List of conversation messages
@@ -82,44 +82,29 @@ class BaseAgent(ABC):
             # Add conversation messages
             api_messages.extend(messages)
 
-            # Prepare API request
-            payload = {
-                "model": self.model_config["model"],
-                "messages": api_messages,
-                "max_tokens": self.model_config["max_tokens"],
-                "temperature": self.model_config["temperature"]
-            }
-
-            # Add API key to headers
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.config.LLM_API_KEY}"
-            }
-
-            # Make API request
-            response = requests.post(
-                self.config.LLM_API_URL,
-                headers=headers,
-                json=payload,
-                timeout=30
+            # Initialize OpenAI client with Cornell endpoint
+            client = OpenAI(
+                api_key=self.config.LLM_API_KEY,
+                base_url=self.config.LLM_API_URL
             )
 
-            response.raise_for_status()
-            result = response.json()
+            # Make API request
+            response = client.chat.completions.create(
+                model=self.model_config["model"],
+                messages=api_messages,
+                max_tokens=self.model_config["max_tokens"],
+                temperature=self.model_config["temperature"]
+            )
 
             # Extract response text
-            if "choices" in result and len(result["choices"]) > 0:
-                return result["choices"][0]["message"]["content"].strip()
+            if response.choices and len(response.choices) > 0:
+                return response.choices[0].message.content.strip()
             else:
                 raise ValueError("No response from LLM API")
 
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             self.logger.error(f"API request error: {e}")
             return "I apologize, but I'm having trouble connecting to the AI service. Please try again."
-
-        except Exception as e:
-            self.logger.error(f"Unexpected error in LLM request: {e}")
-            return "I encountered an unexpected error. Please try again."
 
     def _format_conversation_history(self, messages: List[Dict]) -> str:
         """

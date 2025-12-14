@@ -7,7 +7,7 @@ A comprehensive AI-powered training system designed to help hotel front desk sta
 This system uses three specialized AI agents to create an immersive training environment:
 
 - **🎭 Guest Agent**: Simulates realistic hotel guest scenarios and interactions
-- **💡 Coach Agent**: Provides real-time feedback based on training materials using RAG (Retrieval-Augmented Generation)
+- **💡 Coach Agent**: Provides real-time feedback based on training materials using a YAML-backed retriever
 - **📊 Report Agent**: Generates detailed training reports and performance analytics
 
 The system processes your existing training documents (PDF, Word, Excel, Text files) and uses them as the knowledge base for coaching and feedback, ensuring consistency with your established training standards.
@@ -16,8 +16,8 @@ The system processes your existing training documents (PDF, Word, Excel, Text fi
 
 ### Core Functionality
 - **Real-time Chat Interface**: Streamlit-based web interface for natural conversation flow
-- **Intelligent Document Processing**: Automatically processes and vectorizes training materials
-- **RAG-Powered Coaching**: Provides feedback based on your actual training documents
+- **Intelligent Document Processing**: Automatically processes training materials for reference and retrieval
+- **Reference-driven Coaching**: Provides feedback based on your canonical training reference (YAML) and other documents
 - **Performance Analytics**: Detailed session reports and progress tracking
 - **Multi-format Support**: Handles .pdf, .docx, .doc, .xlsx, .xls, and .txt files
 - **Gap Identification**: Identifies areas where training materials may need enhancement
@@ -40,11 +40,9 @@ hotel-training-system/
 │   ├── guest_agent.py             # Guest simulation agent
 │   ├── coach_agent.py             # Real-time coaching agent
 │   └── report_agent.py            # Report generation agent
-├── rag_system/                     # RAG and vector search
+├── rag_system/                     # Retriever implementation (YAML-backed)
 │   ├── __init__.py
-│   ├── retriever.py               # Main RAG interface
-│   ├── embeddings.py              # Embedding generation
-│   └── vector_store.py            # ChromaDB vector storage
+│   └── retriever.py               # Main retriever interface (uses `hotel_training_reference.yaml`)
 ├── document_processor/             # Document processing pipeline
 │   ├── __init__.py
 │   ├── processor.py               # Main document processor
@@ -58,8 +56,7 @@ hotel-training-system/
 │   ├── logger.py                  # Logging configuration
 │   └── session_manager.py         # Session management
 ├── data/                          # Data storage
-│   ├── vectorstore/               # ChromaDB vector database
-│   └── sessions/                  # Session data
+│   ├── sessions/                  # Session data
 ├── logs/                          # Application logs
 ├── requirements.txt               # Python dependencies
 ├── .env                          # Environment configuration
@@ -101,7 +98,7 @@ nano .env  # or use your preferred editor
 Required configuration:
 ```env
 # Your LLM API configuration
-LLM_API_URL=https://your-api-endpoint.com/v1/chat/completions
+LLM_API_URL=https://api.ai.it.cornell.edu
 LLM_API_KEY=your_api_key_here
 
 # Model configuration (adjust based on available models)
@@ -112,26 +109,8 @@ DEFAULT_MODEL=gpt-4
 
 # Embedding configuration
 EMBEDDING_MODEL=text-embedding-ada-002
-EMBEDDING_API_URL=https://api.openai.com/v1/embeddings
+EMBEDDING_API_URL=https://api.ai.it.cornell.edu
 ```
-
-### Step 3: Prepare Training Documents
-
-Ensure your training documents are located at:
-```
-/Users/wbo7/Library/CloudStorage/Box-Box/INFO 5940 - Fall 2025/Final Project/Front Desk Training Docs
-```
-
-Or update the path in `config/settings.py`:
-```python
-self.TRAINING_DOCS_PATH = Path("/your/training/documents/path")
-```
-
-Supported formats:
-- PDF files (.pdf)
-- Word documents (.doc, .docx)
-- Excel spreadsheets (.xlsx, .xls)
-- Text files (.txt)
 
 ## Usage
 
@@ -175,7 +154,7 @@ The application will be available at `http://localhost:8501`
 ### Advanced Features
 
 #### Document Management
-The system automatically processes training documents when first started. To refresh the document database:
+The system uses a canonical YAML reference (`hotel_training_reference.yaml`) as the primary knowledge source for coaching and reporting. The retriever loads that YAML at startup and flattens it into searchable sections. If you update the YAML or add new in-memory documents, you can reload the retriever:
 
 ```python
 from rag_system.retriever import RAGRetriever
@@ -183,7 +162,7 @@ from config.settings import AppConfig
 
 config = AppConfig()
 rag = RAGRetriever(config)
-rag.refresh_vector_store()
+rag.refresh_vector_store()  # reloads YAML sections from disk
 ```
 
 #### Custom Scenarios
@@ -212,17 +191,14 @@ BALANCED_MODEL=gpt-4
 SMART_MODEL=gpt-4
 ```
 
-### RAG Configuration
-Adjust retrieval settings:
+### Retrieval Configuration
+Adjust retrieval settings (used to control how many YAML sections the retriever returns):
 
 ```env
-# Number of documents to retrieve for context
+# Number of sections to retrieve for context
 RAG_TOP_K=5
 
-# Minimum similarity score for relevance
-RAG_SIMILARITY_THRESHOLD=0.7
-
-# Text chunking parameters
+# Text chunking parameters (used by document processor)
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 ```
@@ -295,7 +271,7 @@ Add format support in `document_processor/readers.py` or convert files to suppor
 1. **New Agent Types**: Extend `BaseAgent` class in `agents/`
 2. **Document Formats**: Add readers in `document_processor/readers.py`
 3. **Chunking Strategies**: Implement in `document_processor/chunker.py`
-4. **Vector Stores**: Add new stores in `rag_system/vector_store.py`
+4. **Vector Stores (optional)**: Add a vector store implementation under `rag_system/` if you later want to re-enable embedding-based retrieval
 
 ### Testing
 
@@ -315,7 +291,7 @@ python -c "from rag_system.retriever import RAGRetriever; print('RAG system read
 - **Caching**: Implement response caching for repeated queries
 - **Batch Processing**: Process multiple documents simultaneously
 - **Model Selection**: Use appropriate model sizes for different tasks
-- **Vector Store Optimization**: Tune ChromaDB settings for your data size
+-- **Vector Store Optimization (optional)**: If you integrate a vector store, tune its settings for your data size
 
 ## Security Considerations
 
@@ -346,7 +322,7 @@ This project is developed for educational purposes as part of INFO 5940 - Fall 2
 ## Acknowledgments
 
 - Built with Streamlit for the web interface
-- Uses ChromaDB for vector storage
+Uses a YAML-backed reference for retrieval; vector stores are optional for advanced setups
 - Integrates with various LLM providers
 - Supports multiple document formats through specialized libraries
 

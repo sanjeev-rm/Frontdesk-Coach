@@ -62,8 +62,6 @@ def check_python_modules():
         ("config.settings", "config/settings.py"),
         ("rag_system", "rag_system/__init__.py"),
         ("rag_system.retriever", "rag_system/retriever.py"),
-        ("rag_system.embeddings", "rag_system/embeddings.py"),
-        ("rag_system.vector_store", "rag_system/vector_store.py"),
         ("document_processor", "document_processor/__init__.py"),
         ("document_processor.processor", "document_processor/processor.py"),
         ("document_processor.chunker", "document_processor/chunker.py"),
@@ -129,7 +127,6 @@ def check_dependencies():
     core_deps = [
         "streamlit",
         "requests",
-        "chromadb",
         "pandas",
         "pathlib"
     ]

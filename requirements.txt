@@ -2,7 +2,6 @@
 streamlit
 requests
 openai
-chromadb
 numpy
 PyPDF2
 python-docx
@@ -10,3 +9,4 @@ pandas
 openpyxl
 pdfplumber
 python-dotenv
+PyYAML

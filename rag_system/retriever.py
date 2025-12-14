@@ -1,277 +1,173 @@
 """
-RAG Retriever
+YAML-backed Retriever
 
-Main interface for retrieving relevant training documents using vector similarity search.
+This retriever loads a single YAML reference file (`hotel_training_reference.yaml`) and
+provides simple keyword-based retrieval over the document sections. The original RAG
+vector/embedding approach is intentionally not used when a single YAML knowledge file
+is the canonical source of truth.
 """
 
 import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import yaml
 
-from .vector_store import VectorStore
-from .embeddings import EmbeddingGenerator
 from config.settings import AppConfig
 
+
 class RAGRetriever:
-    """Main RAG system for retrieving relevant training documents"""
+    """Simple retriever that uses the YAML reference as the knowledge base."""
 
     def __init__(self, config: AppConfig):
-        """
-        Initialize RAG retriever
-
-        Args:
-            config: Application configuration
-        """
         self.config = config
         self.logger = logging.getLogger(__name__)
 
-        # Initialize components
-        self.embedding_generator = EmbeddingGenerator(config)
-        self.vector_store = VectorStore(config)
+        # Path to the YAML reference file (default to repo root)
+        self.yaml_path = Path("hotel_training_reference.yaml")
+        if hasattr(self.config, 'BASE_DIR') and self.config.BASE_DIR:
+            # Allow yaml in base dir
+            possible = self.config.BASE_DIR / self.yaml_path.name
+            if possible.exists():
+                self.yaml_path = possible
 
-        # Check if vector store needs initialization
-        self._initialize_if_needed()
+        # In-memory list of documents (flattened YAML sections)
+        self.documents: List[Dict[str, Any]] = []
+        self._load_yaml()
 
-    def _initialize_if_needed(self) -> None:
-        """Initialize vector store if it's empty or doesn't exist"""
+    def _load_yaml(self) -> None:
+        """Load and flatten the YAML file into searchable documents."""
         try:
-            # Check if collection exists and has documents
-            collection_info = self.vector_store.get_collection_info()
+            if not self.yaml_path.exists():
+                self.logger.warning(f"YAML reference not found at {self.yaml_path}")
+                self.documents = []
+                return
 
-            if collection_info.get("document_count", 0) == 0:
-                self.logger.info("Vector store is empty. Initializing with training documents...")
-                self._initialize_vector_store()
+            with open(self.yaml_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+
+            # Flatten nested dicts into title/content pairs
+            flat_docs: List[Dict[str, Any]] = []
+
+            def recurse(node, path_parts: List[str]):
+                if isinstance(node, dict):
+                    for k, v in node.items():
+                        recurse(v, path_parts + [str(k)])
+                elif isinstance(node, list):
+                    # Join list items into text
+                    content = "\n".join(str(item) for item in node)
+                    title = " / ".join(path_parts)
+                    flat_docs.append({"title": title, "content": content})
+                else:
+                    # Scalar value
+                    title = " / ".join(path_parts)
+                    flat_docs.append({"title": title, "content": str(node)})
+
+            # YAML top-level may be a mapping
+            if isinstance(data, dict):
+                for top_k, top_v in data.items():
+                    recurse(top_v, [str(top_k)])
             else:
-                self.logger.info(f"Vector store loaded with {collection_info['document_count']} documents")
+                recurse(data, ["root"])
 
-        except Exception as e:
-            self.logger.warning(f"Could not check vector store status: {e}")
-            self.logger.info("Attempting to initialize vector store...")
-            self._initialize_vector_store()
-
-    def _initialize_vector_store(self) -> None:
-        """Initialize vector store with training documents"""
-        try:
-            # Import document processor here to avoid circular imports
-            from document_processor.processor import DocumentProcessor
-
-            doc_processor = DocumentProcessor(self.config)
-
-            # Process all training documents
-            documents = doc_processor.process_all_documents(self.config.TRAINING_DOCS_PATH)
-
-            if documents:
-                self.logger.info(f"Processing {len(documents)} documents for vector store...")
-
-                # Generate embeddings and store documents
-                for doc in documents:
-                    try:
-                        embedding = self.embedding_generator.generate_embedding(doc["content"])
-                        self.vector_store.add_document(
-                            content=doc["content"],
-                            embedding=embedding,
-                            metadata=doc["metadata"]
-                        )
-                    except Exception as e:
-                        self.logger.error(f"Failed to process document {doc.get('source', 'unknown')}: {e}")
-
-                self.logger.info("Vector store initialization completed")
-            else:
-                self.logger.warning("No documents found for processing")
-
-        except ImportError as e:
-            self.logger.error(f"Document processor not available: {e}")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize vector store: {e}")
-
-    def retrieve_relevant_content(self, query: str, top_k: int = None,
-                                similarity_threshold: float = None) -> List[Dict[str, Any]]:
-        """
-        Retrieve relevant training documents for a query
-
-        Args:
-            query: Search query
-            top_k: Number of top results to return
-            similarity_threshold: Minimum similarity score
-
-        Returns:
-            List of relevant documents with content and metadata
-        """
-        if not query.strip():
-            self.logger.warning("Empty query provided to retrieve_relevant_content")
-            return []
-
-        try:
-            # Use config defaults if not provided
-            top_k = top_k or self.config.RAG_TOP_K
-            similarity_threshold = similarity_threshold or self.config.RAG_SIMILARITY_THRESHOLD
-
-            # Generate query embedding
-            query_embedding = self.embedding_generator.generate_embedding(query)
-
-            # Search vector store
-            results = self.vector_store.search_similar(
-                query_embedding=query_embedding,
-                top_k=top_k,
-                similarity_threshold=similarity_threshold
-            )
-
-            # Format results
-            formatted_results = []
-            for result in results:
-                formatted_results.append({
-                    "content": result["content"],
-                    "metadata": result["metadata"],
-                    "similarity_score": result["similarity_score"],
-                    "source": result["metadata"].get("source", "unknown")
+            # Assign ids and metadata
+            for i, doc in enumerate(flat_docs):
+                self.documents.append({
+                    "id": f"yaml_{i}",
+                    "title": doc.get("title", ""),
+                    "content": doc.get("content", ""),
+                    "metadata": {"source": str(self.yaml_path.name), "path": doc.get("title", "")}
                 })
 
-            self.logger.info(f"Retrieved {len(formatted_results)} relevant documents for query")
-            return formatted_results
+            self.logger.info(f"Loaded {len(self.documents)} YAML sections from {self.yaml_path}")
 
         except Exception as e:
-            self.logger.error(f"Failed to retrieve relevant content: {e}")
+            self.logger.error(f"Failed to load YAML reference: {e}")
+            self.documents = []
+
+    def retrieve_relevant_content(self, query: str, top_k: int = None,
+                                  similarity_threshold: float = None) -> List[Dict[str, Any]]:
+        """Retrieve YAML sections that best match the query using simple token matching."""
+        if not query or not query.strip():
             return []
 
-    def add_new_document(self, content: str, metadata: Dict[str, Any]) -> bool:
-        """
-        Add a new document to the vector store
+        top_k = top_k or self.config.RAG_TOP_K
 
-        Args:
-            content: Document content
-            metadata: Document metadata
+        q = query.lower()
+        tokens = [t for t in q.split() if len(t) > 2]
 
-        Returns:
-            bool: Success status
-        """
+        scored = []
+        for doc in self.documents:
+            content = (doc.get("content") or "").lower()
+            score = 0
+            for t in tokens:
+                if t in content:
+                    score += content.count(t)
+
+            # Also check title
+            title = (doc.get("title") or "").lower()
+            for t in tokens:
+                if t in title:
+                    score += 2
+
+            if score > 0:
+                scored.append({"content": doc["content"], "metadata": doc["metadata"], "similarity_score": float(score)})
+
+        # If nothing matched, return a set of general sections (top_k)
+        if not scored:
+            # return first top_k documents as fallback
+            fallback = [
+                {"content": d["content"], "metadata": d["metadata"], "similarity_score": 0.0}
+                for d in self.documents[:top_k]
+            ]
+            return fallback
+
+        # Sort by score descending and return top_k
+        scored.sort(key=lambda x: x["similarity_score"], reverse=True)
+        return scored[:top_k]
+
+    def refresh_vector_store(self) -> bool:
+        """Reload YAML content (keeps method name for compatibility)."""
         try:
-            # Generate embedding
-            embedding = self.embedding_generator.generate_embedding(content)
-
-            # Add to vector store
-            self.vector_store.add_document(
-                content=content,
-                embedding=embedding,
-                metadata=metadata
-            )
-
-            self.logger.info(f"Added new document: {metadata.get('source', 'unknown')}")
+            self.documents = []
+            self._load_yaml()
             return True
-
         except Exception as e:
-            self.logger.error(f"Failed to add new document: {e}")
+            self.logger.error(f"Failed to refresh YAML retriever: {e}")
+            return False
+
+    def add_new_document(self, content: str, metadata: Dict[str, Any]) -> bool:
+        """Add an in-memory document (does not persist to YAML file)."""
+        try:
+            new_id = f"custom_{len(self.documents)}"
+            self.documents.append({"id": new_id, "title": metadata.get("title", new_id), "content": content, "metadata": metadata})
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to add new in-memory document: {e}")
             return False
 
     def search_by_keywords(self, keywords: List[str], top_k: int = None) -> List[Dict[str, Any]]:
-        """
-        Search for documents containing specific keywords
-
-        Args:
-            keywords: List of keywords to search for
-            top_k: Number of results to return
-
-        Returns:
-            List of matching documents
-        """
+        """Convenience wrapper to search by keywords."""
         if not keywords:
             return []
-
-        # Create query from keywords
-        query = " ".join(keywords)
-        return self.retrieve_relevant_content(query, top_k)
+        return self.retrieve_relevant_content(" ".join(keywords), top_k=top_k)
 
     def get_document_stats(self) -> Dict[str, Any]:
-        """
-        Get statistics about the document collection
-
-        Returns:
-            Dict containing collection statistics
-        """
-        try:
-            stats = self.vector_store.get_collection_info()
-            return {
-                "total_documents": stats.get("document_count", 0),
-                "collection_name": self.config.CHROMA_COLLECTION_NAME,
-                "embedding_model": self.config.EMBEDDING_MODEL,
-                "chunk_size": self.config.CHUNK_SIZE,
-                "chunk_overlap": self.config.CHUNK_OVERLAP
-            }
-        except Exception as e:
-            self.logger.error(f"Failed to get document stats: {e}")
-            return {"error": str(e)}
-
-    def refresh_vector_store(self) -> bool:
-        """
-        Refresh the vector store by reprocessing all training documents
-
-        Returns:
-            bool: Success status
-        """
-        try:
-            self.logger.info("Refreshing vector store...")
-
-            # Clear existing data
-            self.vector_store.clear_collection()
-
-            # Reinitialize
-            self._initialize_vector_store()
-
-            self.logger.info("Vector store refresh completed")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to refresh vector store: {e}")
-            return False
+        """Return simple stats about loaded YAML sections."""
+        return {
+            "total_sections": len(self.documents),
+            "source": str(self.yaml_path.name)
+        }
 
     def identify_content_gaps(self, recent_queries: List[str]) -> Dict[str, Any]:
-        """
-        Identify potential gaps in training content based on queries that return few results
-
-        Args:
-            recent_queries: List of recent search queries
-
-        Returns:
-            Dict containing gap analysis
-        """
-        gaps = []
+        """Identify queries that returned few or no matches."""
         low_result_queries = []
-
-        for query in recent_queries:
-            results = self.retrieve_relevant_content(query, top_k=3)
-
-            if len(results) < 2:  # Fewer than 2 relevant results
-                low_result_queries.append({
-                    "query": query,
-                    "result_count": len(results),
-                    "best_score": results[0]["similarity_score"] if results else 0.0
-                })
+        for q in recent_queries:
+            results = self.retrieve_relevant_content(q, top_k=3)
+            if not results or all(r.get("similarity_score", 0) == 0 for r in results):
+                low_result_queries.append({"query": q, "result_count": len(results)})
 
         return {
             "potential_gaps": low_result_queries,
             "gap_count": len(low_result_queries),
-            "total_queries_analyzed": len(recent_queries),
-            "recommendations": self._generate_gap_recommendations(low_result_queries)
+            "total_queries_analyzed": len(recent_queries)
         }
-
-    def _generate_gap_recommendations(self, low_result_queries: List[Dict]) -> List[str]:
-        """Generate recommendations for addressing content gaps"""
-        if not low_result_queries:
-            return ["No significant content gaps identified"]
-
-        recommendations = []
-        common_terms = {}
-
-        # Analyze common terms in low-result queries
-        for query_info in low_result_queries:
-            words = query_info["query"].lower().split()
-            for word in words:
-                if len(word) > 3:  # Skip short words
-                    common_terms[word] = common_terms.get(word, 0) + 1
-
-        # Generate recommendations based on common terms
-        frequent_terms = sorted(common_terms.items(), key=lambda x: x[1], reverse=True)[:5]
-
-        for term, count in frequent_terms:
-            recommendations.append(f"Consider adding training content about '{term}' (mentioned in {count} low-result queries)")
-
-        return recommendations

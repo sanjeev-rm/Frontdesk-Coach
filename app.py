@@ -10,6 +10,10 @@ import streamlit as st
 import asyncio
 from datetime import datetime
 import json
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import our custom modules
 from agents.guest_agent import GuestAgent

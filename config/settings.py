@@ -30,7 +30,7 @@ class AppConfig:
         self.VECTOR_STORE_DIR.mkdir(exist_ok=True)
 
         # LLM Configuration
-        self.LLM_API_URL = os.getenv("LLM_API_URL", "https://api.openai.com/v1/chat/completions")
+        self.LLM_API_URL = os.getenv("LLM_API_URL", "https://api.ai.it.cornell.edu")
         self.LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 
         # Model Configuration - Using different models for different agents to optimize cost
@@ -46,7 +46,7 @@ class AppConfig:
 
         # Embedding Configuration
         self.EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")
-        self.EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://api.openai.com/v1/embeddings")
+        self.EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://api.ai.it.cornell.edu")
 
         # RAG Configuration
         self.RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))

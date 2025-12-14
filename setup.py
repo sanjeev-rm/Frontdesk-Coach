@@ -79,7 +79,6 @@ def test_imports():
     """Test that key modules can be imported"""
     test_modules = [
         ("streamlit", "Streamlit web framework"),
-        ("chromadb", "ChromaDB vector database"),
         ("requests", "HTTP requests library"),
         ("pandas", "Data processing library")
     ]
@@ -101,7 +100,7 @@ def create_sample_config():
 # Sample configuration for testing
 # DO NOT use in production - replace with real API credentials
 
-LLM_API_URL=https://api.openai.com/v1/chat/completions
+LLM_API_URL=https://api.ai.it.cornell.edu
 LLM_API_KEY=your_api_key_here
 
 FAST_MODEL=gpt-3.5-turbo
@@ -110,7 +109,7 @@ SMART_MODEL=gpt-4
 DEFAULT_MODEL=gpt-4
 
 EMBEDDING_MODEL=text-embedding-ada-002
-EMBEDDING_API_URL=https://api.openai.com/v1/embeddings
+EMBEDDING_API_URL=https://api.ai.it.cornell.edu
 
 DEBUG=true
 LOG_LEVEL=INFO

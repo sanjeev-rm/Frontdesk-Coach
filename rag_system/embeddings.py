@@ -10,70 +10,18 @@ import time
 from typing import List, Union
 from config.settings import AppConfig
 
-class EmbeddingGenerator:
-    """Generates text embeddings using configured embedding API"""
+"""
+Deprecated Embedding Module
 
-    def __init__(self, config: AppConfig):
-        """
-        Initialize embedding generator
+This project has been simplified to use a YAML-backed retriever (`rag_system.retriever`).
+The embedding-based implementation has been deprecated and is no longer used by the
+application. The file remains as a placeholder to avoid breaking imports in older
+deployments; importing it will raise an informative error.
+"""
 
-        Args:
-            config: Application configuration
-        """
-        self.config = config
-        self.logger = logging.getLogger(__name__)
-        self.embedding_config = config.get_embedding_config()
-
-    def generate_embedding(self, text: str) -> List[float]:
-        """
-        Generate embedding for a single text
-
-        Args:
-            text: Input text to embed
-
-        Returns:
-            List of float values representing the embedding
-        """
-        if not text.strip():
-            raise ValueError("Cannot generate embedding for empty text")
-
-        try:
-            # Prepare API request
-            payload = {
-                "model": self.embedding_config["model"],
-                "input": text.strip()
-            }
-
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.embedding_config['api_key']}"
-            }
-
-            # Make API request
-            response = requests.post(
-                self.embedding_config["api_url"],
-                headers=headers,
-                json=payload,
-                timeout=30
-            )
-
-            response.raise_for_status()
-            result = response.json()
-
-            # Extract embedding from response
-            if "data" in result and len(result["data"]) > 0:
-                embedding = result["data"][0]["embedding"]
-                return embedding
-            else:
-                raise ValueError("No embedding data in API response")
-
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed for embedding generation: {e}")
-            raise Exception(f"Failed to generate embedding: {e}")
-
-        except Exception as e:
-            self.logger.error(f"Unexpected error in embedding generation: {e}")
-            raise Exception(f"Embedding generation error: {e}")
+raise ImportError(
+    "EmbeddingGenerator has been removed. The project now uses a YAML-backed retriever."
+)
 
     def generate_embeddings_batch(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
         """
