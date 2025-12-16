@@ -81,8 +81,8 @@ class ReportAgent(BaseAgent):
                 RELEVANT TRAINING BENCHMARKS:
                 {training_benchmarks}
 
-                FULL CONVERSATION:
-                {self._format_detailed_conversation(conversation_history)}
+                FULL CONVERSATION (last 10 exchanges):
+                {self._format_detailed_conversation(conversation_history[-10:])}
 
                 Create a professional training report that includes:
                 1. Executive Summary (2-3 sentences)
@@ -98,14 +98,37 @@ class ReportAgent(BaseAgent):
             }
         ]
 
+        # Temporarily increase max_tokens for report generation
+        original_max_tokens = self.model_config["max_tokens"]
+        self.model_config["max_tokens"] = 4000
+
         report = self._make_llm_request(messages, self.get_system_prompt())
 
-        if self.validate_response(report):
+        # Restore original max_tokens
+        self.model_config["max_tokens"] = original_max_tokens
+
+        # Reports can be longer than coaching feedback
+        if self._validate_report_response(report):
             # Save report for record keeping
             self._save_report(session_id, report, conversation_history)
             return report
         else:
             return self._generate_basic_report(conversation_history, session_id)
+
+    def _validate_report_response(self, response: str) -> bool:
+        """
+        Validate report response (allows longer responses than general validation)
+
+        Args:
+            response: Response to validate
+
+        Returns:
+            bool: True if valid, False otherwise
+        """
+        # Reports can be longer than coaching feedback
+        is_valid = len(response.strip()) > 0 and len(response) < 8000
+        self.logger.info(f"Validating report response: length={len(response)}, is_valid={is_valid}")
+        return is_valid
 
     def generate_summary_metrics(self, conversation_history: List[Dict]) -> Dict[str, Any]:
         """
@@ -192,15 +215,22 @@ class ReportAgent(BaseAgent):
                 4. Key decision points and outcomes
                 5. Adherence to service standards
 
-                Provide a comprehensive analysis (3-4 paragraphs).
+                Provide a concise analysis (1-2 paragraphs, under 300 words).
                 """
             }
         ]
+
+        # Use lower max_tokens for analysis to keep it concise
+        original_max_tokens = self.model_config["max_tokens"]
+        self.model_config["max_tokens"] = 1000
 
         analysis = self._make_llm_request(
             messages,
             "You are a customer service expert analyzing training interactions."
         )
+
+        # Restore original max_tokens
+        self.model_config["max_tokens"] = original_max_tokens
 
         return analysis if analysis else "Analysis could not be completed."
 
