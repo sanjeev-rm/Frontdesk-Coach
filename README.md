@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/frontdesk-coach-logo.png" alt="FrontDesk Coach" width="600"/>
+  <img src="assets/frontdesk-coach-logo.png" alt="FrontDesk Coach" width="100%"/>
 </p>
 
 <p align="center">
